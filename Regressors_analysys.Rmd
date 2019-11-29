@@ -1,0 +1,313 @@
+---
+title: "Regressors analysys"
+author: "Spartak Bughdaryan"
+date: "11/29/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+
+require(ggplot2)
+require(dplyr)
+require(gridExtra)
+```
+
+<h1>Content</h1>
+<ul>
+  <li><a href="#about-data">About data</a></li>
+  <li><a href="#analysys">Analysys</a></li>
+  <li><a href="#hyperparameters">Hyper parameters</a></li>
+  <li><a href="#conclusion">Conclusion</a></li>
+</ul>
+
+<h2 id="about-data">About data</h2>
+For data I generated 3000 points, I took some covariance matrix, computed eiganvalues and eiganvectors of that matrix, and with normalized random Xs calculated Ys.
+You can view it in `generate_data.py` for more detail. So overall generated 3 files (see plots above).
+
+The first data.
+
+```{r}
+df1 <- read.csv('data/1.csv')
+df1$X.1 <- NULL
+
+df1 %>% ggplot(aes(X,Y)) + geom_point() + labs(title = "First data")
+```
+
+The second data.
+
+```{r}
+df2 <- read.csv('data/2.csv')
+df2$X.1 <- NULL
+
+df2 %>% ggplot(aes(X,Y)) + geom_point() + labs(title = "Second data")
+```
+
+And third.
+
+```{r}
+df3 <- read.csv('data/3.csv')
+df3$X.1 <- NULL
+
+df3 %>% ggplot(aes(X,Y)) + geom_point() + labs(title = "Third data")
+```
+
+Here we have different cases with different corelation between X and Y.
+We will see differences between data and overall analysys.
+
+<h2 id="analysys">Analysys</h2>
+Lets start from first dataset named `df1` and see histogram and density plot of regressors after 1000 random samples with 500 sample size
+
+Here we iterate `iter_count` times, and each time calculate linear model for sample, save coeficients, variation and mean
+
+```{r}
+iter_count <- 1000
+sample_size <- 500
+df1_bs = data.frame(b0 = numeric(), b1=numeric(), var=numeric(), mean.X = numeric(), mean.Y = numeric(), iter_count = numeric())
+set.seed(1)
+for (i in 1:iter_count) {
+  df_sample <- sample_n(df1, sample_size)
+  model <- lm(Y~X, df_sample)
+    
+  b0 <- coef(model)[1]
+  b1 <- coef(model)[2]
+  
+  df1_bs <- rbind(df1_bs, data.frame(b0 = c(b0), b1 = c(b1),mean.X=mean(df_sample$X), mean.Y = mean(df_sample$Y), var=var(df_sample)))
+}
+
+head(df1_bs)
+```
+
+And the histogram
+
+```{r}
+grid.arrange(
+  df1_bs %>% ggplot(aes(b0)) + geom_histogram(fill='red') + labs(xlab="b0", ylab="count", title="b0 histogram after 1000 iteration with 500 sample size"),
+  df1_bs %>% ggplot(aes(b1)) + geom_histogram(fill='blue') + labs(xlab="b1", ylab="count", title="b1 histogram after 1000 iteration with 500 sample size")
+)
+```
+
+We can also take a look at density plots
+
+```{r}
+df1_b0_plot <- df1_bs %>% ggplot(aes(b0)) +
+  geom_density(fill='red') +
+  labs(xlab="b0", ylab="count", title="b0 histogram after 1000 iteration with 500 sample size")
+df1_b1_plot <- df1_bs %>% ggplot(aes(b1)) +
+  geom_density(fill='blue') + 
+  labs(xlab="b1", ylab="count", title="b1 histogram after 1000 iteration with 500 sample size")
+
+grid.arrange(
+  df1_b0_plot,
+  df1_b1_plot
+)
+```
+
+They both look pretty much normal distributions, now lets calculate linear model for whole `df1` and see if they are equal
+
+```{r}
+model <- lm(Y~X, df1)
+
+df1_b0 <- coef(model)[1]
+df1_b1 <- coef(model)[2]
+
+grid.arrange(
+  df1_b0_plot + geom_vline(xintercept = df1_b0, color='black', size=1),
+  df1_b1_plot + geom_vline(xintercept = df1_b1, color='black', size=1)
+)
+```
+
+As we can see, the actual $`b_0`$ and $`b_1`$ are in the middle of both plots, now lets do some hypothesis testing for $b_0$ and $b_1$
+
+1. $H_{0}: df_1.b_0 = b_0$, $H_{A}: df_1.b_0 \ne b_0$
+2. $H_{0}: df_1.b_1 = b_1$, $H_{A}: df_1.b_1 \ne b_1$
+
+```{r}
+set.seed(1)
+t.test(x=df1_bs$b0, mu=df1_b0)
+```
+As we can see, p-value for $b_0$ is greather than $0.05$ so we cannot reject for $b_0$
+
+```{r}
+set.seed(1)
+t.test(x=df1_bs$b1, mu=df1_b1)
+```
+
+And same for $b_1$, we cannot reject it.
+
+We can also do same process for $df_2$ and $df_3$, I will repeat the process and skip the explanation part just not to bore you.
+
+```{r}
+iter_count <- 1000
+sample_size <- 500
+df2_bs = data.frame(b0 = numeric(), b1=numeric(), var=numeric(), mean.X = numeric(), mean.Y = numeric(), iter_count = numeric())
+df3_bs = data.frame(b0 = numeric(), b1=numeric(), var=numeric(), mean.X = numeric(), mean.Y = numeric(), iter_count = numeric())
+set.seed(1)
+for (i in 1:iter_count) {
+  df_sample <- sample_n(df2, sample_size)
+  model <- lm(Y~X, df_sample)
+    
+  b0 <- coef(model)[1]
+  b1 <- coef(model)[2]
+  
+  df2_bs <- rbind(df2_bs, data.frame(b0 = c(b0), b1 = c(b1),mean.X=mean(df_sample$X), mean.Y = mean(df_sample$Y), var=var(df_sample)))
+  
+  
+  
+  df_sample <- sample_n(df3, sample_size)
+  model <- lm(Y~X, df_sample)
+    
+  b0 <- coef(model)[1]
+  b1 <- coef(model)[2]
+  
+  df3_bs <- rbind(df3_bs, data.frame(b0 = c(b0), b1 = c(b1),mean.X=mean(df_sample$X), mean.Y = mean(df_sample$Y), var=var(df_sample)))
+}
+
+model <- lm(Y~X, df2)
+
+df2_b0 <- coef(model)[1]
+df2_b1 <- coef(model)[2]
+
+model <- lm(Y~X, df3)
+
+df3_b0 <- coef(model)[1]
+df3_b1 <- coef(model)[2]
+```
+
+Now we are done with calculation part, we can see the plots for each of them
+
+Density plot for $df_2$
+
+```{r}
+df2_b0_plot <- df2_bs %>% ggplot(aes(b0)) +
+  geom_density(fill='red') +
+  labs(xlab="b0", ylab="count", title="b0 histogram after 1000 iteration with 500 sample size")
+df2_b1_plot <- df2_bs %>% ggplot(aes(b1)) +
+  geom_density(fill='blue') + 
+  labs(xlab="b1", ylab="count", title="b1 histogram after 1000 iteration with 500 sample size")
+
+grid.arrange(
+  df2_b0_plot + geom_vline(xintercept = df2_b0, color='black', size=1),
+  df2_b1_plot + geom_vline(xintercept = df2_b1, color='black', size=1)
+)
+```
+
+And also tests
+
+For $b_0$
+
+```{r}
+set.seed(1)
+t.test(x=df2_bs$b0, mu=df2_b0)
+```
+
+And for $b_1$
+
+```{r}
+set.seed(1)
+t.test(x=df2_bs$b1, mu=df2_b1)
+```
+
+And for $df_3$
+
+```{r}
+df3_b0_plot <- df3_bs %>% ggplot(aes(b0)) +
+  geom_density(fill='red') +
+  labs(xlab="b0", ylab="count", title="b0 histogram after 1000 iteration with 500 sample size")
+df3_b1_plot <- df3_bs %>% ggplot(aes(b1)) +
+  geom_density(fill='blue') + 
+  labs(xlab="b1", ylab="count", title="b1 histogram after 1000 iteration with 500 sample size")
+
+grid.arrange(
+  df3_b0_plot + geom_vline(xintercept = df3_b0, color='black', size=1),
+  df3_b1_plot + geom_vline(xintercept = df3_b1, color='black', size=1)
+)
+```
+
+And tests
+
+```{r}
+set.seed(1)
+t.test(x=df3_bs$b0, mu=df3_b0)
+```
+
+And for $b_1$
+
+```{r}
+set.seed(1)
+t.test(x=df3_bs$b1, mu=df3_b1)
+```
+
+As we see, all our hypothesis had $p-value > \alpha = 0.05$ so we cannot reject any of them.
+
+<h2 id=hyperparameters">Hyperparameters</h2>
+
+One thing we can do is to change number of iterations and sample size, and see what we get
+
+Lets start with number of iterations
+We can start with 10 iterations and multiply after each big iteration by some number
+```{r}
+iter_count <- 10
+iter_count_multiplier <- c(10,10,10,5)
+sample_size <- 500 
+bs = data.frame(b0 = numeric(), b1=numeric(),mean.X = numeric(), mean.Y=numeric(), var.X=numeric(),var.Y = numeric(), iter_count = numeric())
+for (j in 1:length(iter_count_multiplier)) {
+  set.seed(1)
+  for (i in 1:iter_count) {
+    df_sample <- sample_n(df1, sample_size)
+    model <- lm(Y~X, df_sample)
+    
+    b0 <- coef(model)[1]
+    b1 <- coef(model)[2]
+    
+    bs <- rbind(bs, data.frame(b0 = c(b0), b1 = c(b1),mean.X=mean(df_sample$X), mean.Y = mean(df_sample$Y), var.X=var(df_sample)[1,'X'], var.Y = var(df_sample)[2,'Y'], iter_count = c(iter_count)))
+  }
+  iter_count <- iter_count*iter_count_multiplier[j]
+}
+```
+
+And now lets look at plots
+
+```{r}
+grid.arrange(bs %>% 
+               ggplot(aes(b0)) + 
+               geom_density(fill='red') + 
+               geom_vline(xintercept = df1_b0, color='black', size=1) +
+               facet_wrap(.~iter_count) + 
+               labs(title="b0 by iterations"),
+             bs %>%
+               ggplot(aes(b1)) + 
+               geom_density(fill='blue') + 
+               geom_vline(xintercept = df1_b1, color='black', size=1) +
+               facet_wrap(.~iter_count)+ 
+               labs(title="b1 by iterations"))
+```
+
+As we can see, after every $10^j$ iteration, it is becoming to look like normal distribution.
+
+We also can see how variances and means are changed.
+
+```{r}
+bs %>% group_by(iter_count) %>% summarise(bs.mean.X = mean(mean.X), bs.mean.Y = mean(mean.Y), bs.var.X = mean(var.X), bs.var.Y = mean(var.Y)) %>% cbind(mean.X = mean(df1$X), mean.Y = mean(df1$Y), var.X=var(df1)[1,'X'],var.Y=var(df1)[2,'Y']) %>% select(iter_count, bs.mean.X, mean.X, bs.mean.Y, mean.Y, bs.var.X, var.X, bs.var.Y, var.Y)
+```
+
+We can see that after each $10^j$ iteration mean and variation of sample is approaching to $df_1$s mean and variation.
+
+
+<h2 id="conclusion">Conclusion</h2>
+
+So far,
+  we looked at histogram and density plots, after 1000 sample iterations which seemed to be normal, 
+  
+  we did hypothesis testing, after which we saw that for all dataframes $p-value > \alpha = 0.05$, so we couldn't reject any hypothesis
+
+  we saw that density plot is becoming more normal after $10,10^2, 10^3, 10^4$ iterations, 
+
+  we saw that mean and variation of sample is approaching to populations mean and variation, 
+
+and what we can conclude is that 
+  by increasing number of sample iteration, our sample is behaving like population `in average`, 
+  regressors of sample are aproaching to populations regressors `in average`.
+  
+I hope it wasn't boring and You enjoy it.
+Thank you for reading.
